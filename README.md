@@ -10,7 +10,16 @@
      - quality - 0 -99
      - out - output file name
      - ext - image extention
+     - outfile - a filename where to save scaled image, if not given the binary image data is passed to the callback
  - `resizeImageSync(name,width,height,format,filter,quality,outfile)` - resize an image synchronically
+
+```javascript
+  var wand = require("bkjs-wand");
+
+  wand.resizeImage("a.png", { width: 120, height: 120 }, function(err, data) {
+     if (!err) fs.writeFile("b.png", data);
+  })
+```
 
 # Author 
 
