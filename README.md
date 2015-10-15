@@ -1,5 +1,16 @@
 # ImageMagick wand module for node and backendjs
 
+# Requirements
+
+Installing dependencies on CentOS:
+
+    yum -y install libpng-devel libjpeg-turbo-devel
+
+Installing dependencies on Mac OS X using macports:
+
+    port install libpng jpeg
+
+
 # Usage
 
  - `resizeImage(source, options, callback)` - resize image using ImageMagick
