@@ -3,6 +3,8 @@
 //  April 2013
 //
 
+#ifdef USE_WAND
+
 #include "bkjs.h"
 #include "bklib.h"
 #include <wand/MagickWand.h>
@@ -340,5 +342,10 @@ void WandInit(Handle<Object> target)
     NAN_EXPORT(target, resizeImage);
     NAN_EXPORT(target, resizeImageSync);
 }
+#else
+void WandInit(Handle<Object> target)
+{
+}
+#endif
 
 NODE_MODULE(binding, WandInit);
