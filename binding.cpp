@@ -12,14 +12,14 @@
 // Async request for magickwand resize callback
 class MagickBaton {
 public:
-    MagickBaton(): image(0), exception(0), err(0) {
+    MagickBaton(): cb(0), image(0), exception(0), err(0) {
         memset(&d, 0, sizeof(d));
         filter = LanczosFilter;
     }
     ~MagickBaton() {
-        if (!cb.IsEmpty()) cb.Dispose();
+        if (cb) delete cb;
     }
-    Persistent<Function> cb;
+    Nan::Callback *cb;
     unsigned char *image;
     char *exception;
     string format;
@@ -213,10 +213,10 @@ static void afterResizeImage(uv_work_t *req)
 
     Local<Value> argv[4];
 
-    if (!baton->cb.IsEmpty()) {
+    if (baton->cb && !baton->cb->IsEmpty()) {
         if (baton->err || baton->exception) {
             argv[0] = Exception::Error(String::New(baton->err ? strerror(baton->err) : baton->exception));
-            NAN_TRY_CATCH_CALL(Context::GetCurrent()->Global(), baton->cb, 1, argv);
+            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
         } else
         if (baton->image) {
             Buffer *buf = Buffer::New((const char*)baton->image, baton->length);
@@ -224,10 +224,10 @@ static void afterResizeImage(uv_work_t *req)
             argv[1] = Local<Value>::New(buf->handle_);
             argv[2] = Nan::New(baton->d.width);
             argv[3] = Nan::New(baton->d.height);
-            NAN_TRY_CATCH_CALL(Context::GetCurrent()->Global(), baton->cb, 4, argv);
+            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 4, argv);
         } else {
             argv[0] = Nan::New(Nan::Null());
-            NAN_TRY_CATCH_CALL(Context::GetCurrent()->Global(), baton->cb, 1, argv);
+            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
         }
     }
     if (baton->image) MagickRelinquishMemory(baton->image);
@@ -245,7 +245,7 @@ static NAN_METHOD(resizeImage)
     uv_work_t *req = new uv_work_t;
     MagickBaton *baton = new MagickBaton;
     req->data = baton;
-    baton->cb = Persistent<Function>::New(cb);
+    if (!cb.IsEmpty()) baton->cb = new Nan::Callback(cb);
 
     const Local<Array> names = opts->GetPropertyNames();
     for (uint i = 0 ; i < names->Length(); ++i) {
@@ -336,7 +336,7 @@ err:
 
 void WandInit(Handle<Object> target)
 {
-    Nan:HandleScope scope;
+    Nan::HandleScope scope;
 
     MagickWandGenesis();
     NAN_EXPORT(target, resizeImage);
