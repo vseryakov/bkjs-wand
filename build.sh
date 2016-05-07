@@ -21,6 +21,14 @@ if [ ! -d $BKJS_DEPS/ImageMagick ]; then
    curl -OL http://www.imagemagick.org/download/ImageMagick.tar.gz
    tar -C $BKJS_DEPS/ImageMagick --strip-components=1 -xzf ImageMagick.tar.gz && rm -rf ImageMagick.tar.gz
 fi
-(cd $BKJS_DEPS/ImageMagick && [ ! -f Makefile ] && ./configure --prefix=$BKJS_PREFIX --disable-docs --disable-installed --disable-shared --disable-deprecated --enable-zero-configuration --without-x --without-magick-plus-plus --without-perl)
+(cd $BKJS_DEPS/ImageMagick && [ ! -f Makefile ] && ./configure --prefix=$BKJS_PREFIX \
+                 --disable-docs \
+                 --disable-installed \
+                 --disable-shared \
+                 --disable-deprecated \
+                 --enable-zero-configuration \
+                 --without-x \
+                 --without-magick-plus-plus \
+                 --without-perl)
 (cd $BKJS_DEPS/ImageMagick && make install)
 exit 0

@@ -3,10 +3,10 @@
 //  April 2013
 //
 
-#ifdef USE_WAND
-
 #include "bkjs.h"
 #include "bklib.h"
+
+#ifdef USE_WAND
 #include <wand/MagickWand.h>
 
 // Async request for magickwand resize callback
