@@ -7,7 +7,7 @@
 #include "bklib.h"
 
 #ifdef USE_WAND
-#include <wand/MagickWand.h>
+#include <MagickWand/MagickWand.h>
 
 // Async request for magickwand resize callback
 class MagickBaton {
@@ -25,7 +25,7 @@ public:
     string format;
     string path;
     string out;
-    FilterTypes filter;
+    FilterType filter;
     int err;
     size_t length;
     string bgcolor;
@@ -49,13 +49,13 @@ public:
         bool normalize;
         bool flip;
         bool flop;
-        bool dither;
+        DitherMethod dither;
         double rotate;
         double opacity;
     } d;
 };
 
-static FilterTypes getMagickFilter(string filter)
+static FilterType getMagickFilter(string filter)
 {
     return filter == "point" ? PointFilter :
                   filter == "box" ? BoxFilter :
@@ -138,7 +138,7 @@ static void doResizeImage(uv_work_t *req)
         if (status == MagickFalse) goto err;
     }
     if (baton->d.opacity) {
-        status = MagickSetImageOpacity(wand, baton->d.opacity);
+        status = MagickSetImageAlpha(wand, baton->d.opacity);
         if (status == MagickFalse) goto err;
     }
     if (baton->d.normalize) {
@@ -146,11 +146,11 @@ static void doResizeImage(uv_work_t *req)
         if (status == MagickFalse) goto err;
     }
     if (baton->d.posterize) {
-        status = MagickPosterizeImage(wand, baton->d.posterize, (MagickBooleanType)baton->d.dither);
+        status = MagickPosterizeImage(wand, baton->d.posterize, baton->d.dither);
         if (status == MagickFalse) goto err;
     }
     if (baton->d.quantize) {
-        status = MagickQuantizeImage(wand, baton->d.quantize, RGBColorspace, baton->d.tree_depth, (MagickBooleanType)baton->d.dither, (MagickBooleanType)0);
+        status = MagickQuantizeImage(wand, baton->d.quantize, RGBColorspace, baton->d.tree_depth, baton->d.dither, (MagickBooleanType)0);
         if (status == MagickFalse) goto err;
     }
     if (baton->d.flip) {
@@ -162,7 +162,7 @@ static void doResizeImage(uv_work_t *req)
         if (status == MagickFalse) goto err;
     }
     if (baton->d.width && baton->d.height) {
-        status = MagickResizeImage(wand, baton->d.width, baton->d.height, baton->filter, 1.0);
+        status = MagickResizeImage(wand, baton->d.width, baton->d.height, baton->filter);
         if (status == MagickFalse) goto err;
     }
     if (baton->d.blur_radius || baton->d.blur_sigma) {
@@ -252,8 +252,8 @@ static NAN_METHOD(resizeImage)
         String::Utf8Value key(names->Get(i));
         String::Utf8Value val(opts->Get(names->Get(i))->ToString());
         if (!strcmp(*key, "posterize")) baton->d.posterize = atoi(*val); else
-        if (!strcmp(*key, "dither")) baton->d.dither = atoi(*val); else
-        if (!strcmp(*key, "normalize")) baton->d.normalize = atoi(*val); else
+        if (!strcmp(*key, "dither")) baton->d.dither = (DitherMethod)atoi(*val); else
+        if (!strcmp(*key, "normalize")) baton->d.normalize = (DitherMethod)atoi(*val); else
         if (!strcmp(*key, "quantize")) baton->d.quantize = atoi(*val); else
         if (!strcmp(*key, "treedepth")) baton->d.tree_depth = atoi(*val); else
         if (!strcmp(*key, "flip")) baton->d.normalize = atoi(*val); else
@@ -315,7 +315,7 @@ static NAN_METHOD(resizeImageSync)
         if (w <= 0) w = h * aspectRatio;
     }
     if (w > 0 && h > 0) {
-        status = MagickResizeImage(wand, w, h, getMagickFilter(*filter), 1.0);
+        status = MagickResizeImage(wand, w, h, getMagickFilter(*filter));
         if (status == MagickFalse) goto err;
     }
     if (format.length()) MagickSetImageFormat(wand, *format);
