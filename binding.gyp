@@ -1,7 +1,6 @@
 {
     "target_defaults": {
       "include_dirs": [
-        "bklib",
         "build/include",
         "<(node_root_dir)/deps/openssl/openssl/include",
         "/opt/local/include",
@@ -20,7 +19,6 @@
       ],
       "sources": [
         "binding.cpp",
-        "bklib/bklib.cpp",
       ],
       "conditions": [
         [ 'OS=="mac"', {

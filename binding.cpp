@@ -4,7 +4,18 @@
 //
 
 #include "bkjs.h"
-#include "bklib.h"
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <algorithm>
+#include <vector>
+#include <string>
 
 #ifdef USE_WAND
 #include <MagickWand/MagickWand.h>
@@ -90,6 +101,55 @@ static FilterType getMagickFilter(string filter)
                   filter == "lanczosradius" ? LanczosRadiusFilter:
 #endif
                   LanczosFilter;
+}
+
+static vector<string> bkStrSplit(const string str, const string delim, const string quotes)
+{
+    vector<string> rc;
+    string::size_type i = 0, j = 0, q = string::npos;
+    const string::size_type len = str.length();
+
+    while (i < len) {
+        i = str.find_first_not_of(delim, i);
+        if (i == string::npos) break;
+        // Opening quote
+        if (i && quotes.find(str[i]) != string::npos) {
+            q = ++i;
+            while (q < len) {
+                q = str.find_first_of(quotes, q);
+                // Ignore escaped quotes
+                if (q == string::npos || str[q - 1] != '\\') break;
+                q++;
+            }
+        }
+        // End of the word
+        j = str.find_first_of(delim, i);
+        if (j == string::npos) {
+            rc.push_back(str.substr(i, q != string::npos ? q - i : str.size() - i));
+            break;
+        } else {
+            rc.push_back(str.substr(i, q != string::npos ? q - i : j - i));
+        }
+        i = q != string::npos ? q + 1 : j + 1;
+        q = string::npos;
+    }
+    return rc;
+}
+
+static bool bkMakePath(string path)
+{
+    string dir;
+    vector<string> list = bkStrSplit(path, "/", "");
+    for (uint i = 0; i < list.size() - 1; i++) {
+        dir += list[i] + '/';
+        if (mkdir(dir.c_str(), 0755)) {
+            if (errno != EEXIST) {
+                fprintf(stderr, "%s: %s", dir.c_str(), strerror(errno));
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
 
 static void doResizeImage(uv_work_t *req)
