@@ -19,7 +19,7 @@ fi
 pkg-config --silence-errors --exists Wand
 if [ ! -d $BKJS_DEPS/ImageMagick ]; then
    mkdir -p $BKJS_DEPS/ImageMagick
-   curl -OL http://www.imagemagick.org/download/ImageMagick.tar.gz
+   curl -OL https://www.imagemagick.org/download/ImageMagick.tar.gz
    tar -C $BKJS_DEPS/ImageMagick --strip-components=1 -xzf ImageMagick.tar.gz && rm -rf ImageMagick.tar.gz
 fi
 (cd $BKJS_DEPS/ImageMagick && [ ! -f Makefile ] && ./configure --prefix=$BKJS_PREFIX \
