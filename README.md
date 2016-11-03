@@ -53,12 +53,13 @@ Installing dependencies on Mac OS X using macports:
 ```javascript
   var wand = require("bkjs-wand");
 
-  wand.resizeImage("a.png", { width: 120, height: 120 }, function(err, data) {
+  wand.resizeImage("a.png", { width: 120, height: 120 }, function(err, data, info) {
      if (!err) fs.writeFile("b.png", data);
+     console.log(err, info);
   })
 ```
 
-# Author 
+# Author
 
 Vlad Seryakov
 

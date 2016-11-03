@@ -63,8 +63,21 @@ public:
         DitherMethod dither;
         double rotate;
         double opacity;
+        int orientation;
     } d;
 };
+
+static string getMagickOrientation(int type)
+{
+    return type == TopLeftOrientation ? "TopLeft" :
+      type == TopRightOrientation ? "TopRight" :
+      type == BottomRightOrientation ? "BottomRight" :
+      type == BottomLeftOrientation ? "BottomLeft" :
+      type == LeftTopOrientation ? "LeftTop" :
+      type == RightTopOrientation ? "RightTop" :
+      type == RightBottomOrientation ? "RightBottom" :
+      type == LeftBottomOrientation ? "LeftBottom" : "";
+}
 
 static FilterType getMagickFilter(string filter)
 {
@@ -158,6 +171,7 @@ static void doResizeImage(uv_work_t *req)
     MagickWand *wand = NewMagickWand();
     MagickBooleanType status;
     ExceptionType severity;
+    char *str;
 
     if (baton->image) {
         status = MagickReadImageBlob(wand, baton->image, baton->length);
@@ -169,6 +183,12 @@ static void doResizeImage(uv_work_t *req)
     int width = MagickGetImageWidth(wand);
     int height = MagickGetImageHeight(wand);
     if (status == MagickFalse) goto err;
+
+    str = MagickGetImageProperty(wand, "exif:Orientation");
+    if (str) {
+        baton->d.orientation = atoi(str);
+        free(str);
+    }
 
     // Negative width or height means we should not upscale if the image is already below the given dimensions
     if (baton->d.width < 0) {
@@ -259,6 +279,14 @@ static void doResizeImage(uv_work_t *req)
         baton->image = MagickGetImageBlob(wand, &baton->length);
         if (!baton->image) goto err;
     }
+    // Output info about the new or unmodified image
+    baton->d.width = MagickGetImageWidth(wand);
+    baton->d.height = MagickGetImageHeight(wand);
+    str = MagickGetImageFormat(wand);
+    if (str) {
+        baton->format = str;
+        free(str);
+    }
     DestroyMagickWand(wand);
     return;
 err:
@@ -271,7 +299,7 @@ static void afterResizeImage(uv_work_t *req)
     Nan::HandleScope scope;
     MagickBaton *baton = (MagickBaton *)req->data;
 
-    Local<Value> argv[4];
+    Local<Value> argv[3];
 
     if (baton->cb && !baton->cb->IsEmpty()) {
         if (baton->err || baton->exception) {
@@ -279,12 +307,16 @@ static void afterResizeImage(uv_work_t *req)
             NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
         } else
         if (baton->image) {
+            Local<Object> info = Local<Object>::New(Object::New());
+            info->Set(Nan::New("format").ToLocalChecked(), Nan::New(baton->format).ToLocalChecked());
+            if (baton->d.orientation) info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
+            info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
+            info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
             Buffer *buf = Buffer::New((const char*)baton->image, baton->length);
             argv[0] = Nan::New(Nan::Null());
             argv[1] = Local<Value>::New(buf->handle_);
-            argv[2] = Nan::New(baton->d.width);
-            argv[3] = Nan::New(baton->d.height);
-            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 4, argv);
+            argv[2] = Local<Value>::New(info);
+            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
         } else {
             argv[0] = Nan::New(Nan::Null());
             NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
