@@ -386,53 +386,12 @@ static NAN_METHOD(resizeImage)
     uv_queue_work(uv_default_loop(), req, doResizeImage, (uv_after_work_cb)afterResizeImage);
 }
 
-static NAN_METHOD(resizeImageSync)
-{
-    NAN_REQUIRE_ARGUMENT_AS_STRING(0, name);
-    NAN_REQUIRE_ARGUMENT_INT(1, w);
-    NAN_REQUIRE_ARGUMENT_INT(2, h);
-    NAN_REQUIRE_ARGUMENT_AS_STRING(3, format);
-    NAN_REQUIRE_ARGUMENT_AS_STRING(4, filter);
-    NAN_REQUIRE_ARGUMENT_INT(5, quality);
-    NAN_REQUIRE_ARGUMENT_AS_STRING(6, out);
-
-    MagickWand *wand = NewMagickWand();
-    MagickBooleanType status = MagickReadImage(wand, *name);
-    if (status == MagickFalse) goto err;
-    if (h <= 0 || w <= 0) {
-        int width = MagickGetImageWidth(wand);
-        int height = MagickGetImageHeight(wand);
-        float aspectRatio = (width * 1.0)/height;
-        if (h <= 0) h =  w * (1.0/aspectRatio); else
-        if (w <= 0) w = h * aspectRatio;
-    }
-    if (w > 0 && h > 0) {
-        status = MagickResizeImage(wand, w, h, getMagickFilter(*filter));
-        if (status == MagickFalse) goto err;
-    }
-    if (format.length()) MagickSetImageFormat(wand, *format);
-    if (quality <= 100) MagickSetImageCompressionQuality(wand, quality);
-    status = MagickWriteImage(wand, *out);
-    if (status == MagickFalse) goto err;
-    DestroyMagickWand(wand);
-    return;
-
-err:
-    ExceptionType severity;
-    const char *str = MagickGetException(wand, &severity);
-    string msg(str);
-    MagickRelinquishMemory((char*)str);
-    DestroyMagickWand(wand);
-    ThrowException(Exception::Error(String::New(msg.c_str())));
-}
-
 void WandInit(Handle<Object> target)
 {
     Nan::HandleScope scope;
 
     MagickWandGenesis();
     NAN_EXPORT(target, resizeImage);
-    NAN_EXPORT(target, resizeImageSync);
 }
 #else
 void WandInit(Handle<Object> target)
