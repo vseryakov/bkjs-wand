@@ -303,23 +303,26 @@ static void afterResizeImage(uv_work_t *req)
 
     if (baton->cb && !baton->cb->IsEmpty()) {
         if (baton->err || baton->exception) {
-            argv[0] = Exception::Error(String::New(baton->err ? strerror(baton->err) : baton->exception));
+            argv[0] = Nan::Error(baton->err ? strerror(baton->err) : baton->exception);
             NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
-        } else
-        if (baton->image) {
-            Local<Object> info = Local<Object>::New(Object::New());
+        } else {
+            Local<Object> info = Nan::New<Object>();
             info->Set(Nan::New("format").ToLocalChecked(), Nan::New(baton->format).ToLocalChecked());
             if (baton->d.orientation) info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
             info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
             info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
-            Buffer *buf = Buffer::New((const char*)baton->image, baton->length);
-            argv[0] = Nan::New(Nan::Null());
-            argv[1] = Local<Value>::New(buf->handle_);
-            argv[2] = Local<Value>::New(info);
-            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
-        } else {
-            argv[0] = Nan::New(Nan::Null());
-            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
+
+            if (baton->image) {
+                argv[0] = Nan::Null();
+                argv[1] = Nan::CopyBuffer((const char*)baton->image, baton->length).ToLocalChecked();
+                argv[2] = info;
+                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
+            } else {
+                argv[0] = Nan::Null();
+                argv[1] = Nan::Null();
+                argv[2] = info;
+                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
+            }
         }
     }
     if (baton->image) MagickRelinquishMemory(baton->image);
