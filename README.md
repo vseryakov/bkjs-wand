@@ -48,12 +48,8 @@ Installing dependencies on Mac OS X using macports:
                 lanzos2sharp, robidoux, robidouxsharp, cosine, spline, lanczosradius
 
 
- - `resizeImageSync(name,width,height,format,filter,quality,outfile)` - resize an image synchronically
-
 ```javascript
-  var wand = require("bkjs-wand");
-
-  wand.resizeImage("a.png", { width: 120, height: 120 }, function(err, data, info) {
+  require("bkjs-wand").resizeImage("a.png", { width: 120, height: 120 }, function(err, data, info) {
      if (!err) fs.writeFile("b.png", data);
      console.log(err, info);
   })

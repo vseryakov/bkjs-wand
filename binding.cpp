@@ -3,34 +3,39 @@
 //  April 2013
 //
 
-#include "bkjs.h"
-#include <stdio.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <inttypes.h>
+#include <node.h>
+#include <node_object_wrap.h>
+#include <node_buffer.h>
+#include <node_version.h>
+#include <v8.h>
+#include <v8-profiler.h>
+#include <uv.h>
+#include <nan.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <algorithm>
-#include <vector>
-#include <string>
+
+using namespace node;
+using namespace v8;
+using namespace std;
 
 #ifdef USE_WAND
+
+#define NAN_REQUIRE_ARGUMENT(i) if (info.Length() <= i || info[i]->IsUndefined()) {Nan::ThrowError("Argument " #i " is required");return;}
+#define NAN_REQUIRE_ARGUMENT_OBJECT(i, var) if (info.Length() <= (i) || !info[i]->IsObject()) {Nan::ThrowError("Argument " #i " must be an object"); return;} Local<Object> var(info[i]->ToObject());
+#define NAN_TRY_CATCH_CALL(context, callback, argc, argv) { Nan::TryCatch try_catch; (callback)->Call((context), (argc), (argv)); if (try_catch.HasCaught()) FatalException(try_catch); }
+
 #include <MagickWand/MagickWand.h>
 
 // Async request for magickwand resize callback
 class MagickBaton {
 public:
-    MagickBaton(): cb(0), image(0), exception(0), err(0) {
+    MagickBaton(): image(0), exception(0), err(0) {
         memset(&d, 0, sizeof(d));
         filter = LanczosFilter;
     }
     ~MagickBaton() {
-        if (cb) delete cb;
+        cb.Reset();
     }
-    Nan::Callback *cb;
+    Nan::Persistent<Function> cb;
     unsigned char *image;
     char *exception;
     string format;
@@ -301,27 +306,27 @@ static void afterResizeImage(uv_work_t *req)
 
     Local<Value> argv[3];
 
-    if (baton->cb && !baton->cb->IsEmpty()) {
+    if (!baton->cb.IsEmpty()) {
+        Local<Function> cb = Nan::New(baton->cb);
         if (baton->err || baton->exception) {
             argv[0] = Nan::Error(baton->err ? strerror(baton->err) : baton->exception);
-            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 1, argv);
+            NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), cb, 1, argv);
         } else {
             Local<Object> info = Nan::New<Object>();
             info->Set(Nan::New("format").ToLocalChecked(), Nan::New(baton->format).ToLocalChecked());
             if (baton->d.orientation) info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
             info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
             info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
-
             if (baton->image) {
                 argv[0] = Nan::Null();
                 argv[1] = Nan::CopyBuffer((const char*)baton->image, baton->length).ToLocalChecked();
                 argv[2] = info;
-                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
+                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), cb, 3, argv);
             } else {
                 argv[0] = Nan::Null();
                 argv[1] = Nan::Null();
                 argv[2] = info;
-                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), baton->cb, 3, argv);
+                NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), cb, 3, argv);
             }
         }
     }
@@ -335,12 +340,13 @@ static NAN_METHOD(resizeImage)
 {
     NAN_REQUIRE_ARGUMENT(0);
     NAN_REQUIRE_ARGUMENT_OBJECT(1, opts);
-    NAN_EXPECT_ARGUMENT_FUNCTION(-1, cb);
 
     uv_work_t *req = new uv_work_t;
     MagickBaton *baton = new MagickBaton;
     req->data = baton;
-    if (!cb.IsEmpty()) baton->cb = new Nan::Callback(cb);
+    if (info.Length() > 2 && info[2]->IsFunction()) {
+        baton->cb.Reset(Local<Function>::Cast(info[2]));
+    }
 
     const Local<Array> names = opts->GetPropertyNames();
     for (uint i = 0 ; i < names->Length(); ++i) {
@@ -389,7 +395,7 @@ static NAN_METHOD(resizeImage)
     uv_queue_work(uv_default_loop(), req, doResizeImage, (uv_after_work_cb)afterResizeImage);
 }
 
-void WandInit(Handle<Object> target)
+static NAN_MODULE_INIT(WandInit)
 {
     Nan::HandleScope scope;
 
@@ -397,7 +403,7 @@ void WandInit(Handle<Object> target)
     NAN_EXPORT(target, resizeImage);
 }
 #else
-void WandInit(Handle<Object> target)
+static NAN_MODULE_INIT(WandInit)
 {
 }
 #endif
