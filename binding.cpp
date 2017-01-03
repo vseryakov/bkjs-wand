@@ -221,6 +221,18 @@ static void doResizeImage(uv_work_t *req)
         status = MagickRotateImage(wand, bg, baton->d.rotate);
         DestroyPixelWand(bg);
         if (status == MagickFalse) goto err;
+    } else
+    if (baton->bgcolor.size()) {
+        PixelWand *bg = NewPixelWand();
+        PixelSetColor(bg, baton->bgcolor.c_str());
+        status = MagickSetImageBackgroundColor(wand, bg);
+        DestroyPixelWand(bg);
+        if (status == MagickFalse) goto err;
+        MagickWand *nwand = MagickMergeImageLayers(wand, FlattenLayer);
+        if (nwand) {
+            DestroyMagickWand(wand);
+            wand = nwand;
+        }
     }
     if (baton->d.opacity) {
         status = MagickSetImageAlpha(wand, baton->d.opacity);
