@@ -46,6 +46,9 @@ Installing dependencies on Mac OS X using macports:
                 quadratic, cubic, catrom, mitchell, lanczos, kaiser, welsh, parzen,
                 bohman, barlett, lagrange, jinc, sinc, sincfast, lanczossharp, lanzos2,
                 lanzos2sharp, robidoux, robidouxsharp, cosine, spline, lanczosradius
+     - colorspace - rgb, gray, transparent, ohta, xyz, ycbcr, ycc, yiq, ypbpr, yuv,
+                    cmylk, srgb, hls, hwb
+     - gravity - northwest, north, northeast, west, center, east, southwest, south, southeast
 
 
 ```javascript

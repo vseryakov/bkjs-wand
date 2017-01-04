@@ -31,6 +31,8 @@ public:
     MagickBaton(): image(0), exception(0), err(0) {
         memset(&d, 0, sizeof(d));
         filter = LanczosFilter;
+        d.gravity = UndefinedGravity;
+        d.colorspace = UndefinedColorspace;
     }
     ~MagickBaton() {
         cb.Reset();
@@ -65,7 +67,9 @@ public:
         bool normalize;
         bool flip;
         bool flop;
+        ColorspaceType colorspace;
         DitherMethod dither;
+        GravityType gravity;
         double rotate;
         double opacity;
         int orientation;
@@ -119,6 +123,37 @@ static FilterType getMagickFilter(string filter)
                   filter == "lanczosradius" ? LanczosRadiusFilter:
 #endif
                   LanczosFilter;
+}
+
+static ColorspaceType getMagickColorspace(string type)
+{
+    return type == "rgb" ? RGBColorspace :
+            type == "gray" ? GRAYColorspace:
+            type == "transparent" ? TransparentColorspace :
+            type == "ohta" ? OHTAColorspace :
+            type == "xyz" ? XYZColorspace :
+            type == "ycbcr" ? YCbCrColorspace :
+            type == "ycc" ? YCCColorspace :
+            type == "yiq" ? YIQColorspace :
+            type == "ypbpr" ? YPbPrColorspace :
+            type == "yuv" ? YUVColorspace :
+            type == "cmylk" ? CMYKColorspace :
+            type == "srgb" ? sRGBColorspace :
+            type == "hls" ? HSLColorspace:
+            type == "hwb" ? HWBColorspace : UndefinedColorspace;
+}
+
+static GravityType getMagickGravity(string type)
+{
+    return type == "northwest" ? NorthWestGravity :
+           type == "north" ? NorthGravity :
+           type == "northeast" ? NorthEastGravity :
+           type == "west" ? WestGravity :
+           type == "center" ? CenterGravity :
+           type == "east" ? EastGravity :
+           type == "southwest" ? SouthWestGravity :
+           type == "south" ? SouthGravity :
+           type == "southeast" ? SouthEastGravity : UndefinedGravity;
 }
 
 static vector<string> bkStrSplit(const string str, const string delim, const string quotes)
@@ -233,6 +268,14 @@ static void doResizeImage(uv_work_t *req)
             DestroyMagickWand(wand);
             wand = nwand;
         }
+    }
+    if (baton->d.colorspace != UndefinedColorspace) {
+        status = MagickSetImageColorspace(wand, baton->d.colorspace);
+        if (status == MagickFalse) goto err;
+    }
+    if (baton->d.gravity != UndefinedGravity) {
+        status = MagickSetImageGravity(wand, baton->d.gravity);
+        if (status == MagickFalse) goto err;
     }
     if (baton->d.opacity) {
         status = MagickSetImageAlpha(wand, baton->d.opacity);
@@ -389,7 +432,9 @@ static NAN_METHOD(resizeImage)
         if (!strcmp(*key, "bgcolor")) baton->bgcolor = *val; else
         if (!strcmp(*key, "outfile")) baton->out = *val; else
         if (!strcmp(*key, "ext")) baton->format = *val; else
-        if (!strcmp(*key, "filter")) baton->filter = getMagickFilter(*val);
+        if (!strcmp(*key, "filter")) baton->filter = getMagickFilter(*val); else
+        if (!strcmp(*key, "gravity")) baton->d.gravity = getMagickGravity(*val);
+        if (!strcmp(*key, "colorspace")) baton->d.colorspace = getMagickColorspace(*val);
     }
 
     // If a Buffer passed we use it as a source for image
