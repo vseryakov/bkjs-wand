@@ -19,6 +19,6 @@
   "gypfile": true,
   "scripts": {
     "preinstall": "./build.sh",
-    "install": "node-gyp configure build"
+    "install": "node-gyp configure build --verbose"
   }
 }
