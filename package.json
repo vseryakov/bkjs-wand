@@ -19,6 +19,6 @@
   "gypfile": true,
   "scripts": {
     "preinstall": "./build.sh",
-    "install": "node-gyp configure build --verbose"
+    "install": "echo DEBUGING;sleep 30;node-gyp configure build --verbose"
   }
 }
