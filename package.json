@@ -18,7 +18,6 @@
   "license": "BSD-3-Clause",
   "gypfile": true,
   "scripts": {
-    "preinstall": "./build.sh",
-    "install": "echo DEBUGING;sleep 30;node-gyp configure build --verbose"
+    "install": "./build.sh && node-gyp configure build --verbose"
   }
 }

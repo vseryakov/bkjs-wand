@@ -10,7 +10,6 @@ mkdir -p $BKJS_DEPS
 
 pkg-config --silence-errors --exists libopenjp2
 if [ ! -d $BKJS_DEPS/openjpeg ]; then
-   #(cd $BKJS_DEPS && svn -r r2871 checkout http://openjpeg.googlecode.com/svn/trunk/ openjpeg)
    (cd $BKJS_DEPS && git clone https://github.com/uclouvain/openjpeg.git)
 fi
 (cd $BKJS_DEPS/openjpeg && cmake -DCMAKE_C_FLAGS="$CFLAGS" -DCMAKE_INSTALL_PREFIX=$BKJS_PREFIX -DBUILD_SHARED_LIBS:bool=off -DBUILD_CODEC:bool=off . && make)
