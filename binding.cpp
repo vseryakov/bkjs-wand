@@ -23,7 +23,7 @@ using namespace std;
 #define NAN_REQUIRE_ARGUMENT_OBJECT(i, var) if (info.Length() <= (i) || !info[i]->IsObject()) {Nan::ThrowError("Argument " #i " must be an object"); return;} Local<Object> var(info[i]->ToObject());
 #define NAN_TRY_CATCH_CALL(context, callback, argc, argv) { Nan::TryCatch try_catch; (callback)->Call((context), (argc), (argv)); if (try_catch.HasCaught()) FatalException(try_catch); }
 
-#include <MagickWand/MagickWand.h>
+#include "MagickWand/MagickWand.h"
 
 // Async request for magickwand resize callback
 class MagickBaton {
