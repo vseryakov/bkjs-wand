@@ -1,5 +1,5 @@
 {
-  "version": "0.4.3",
+  "version": "0.4.4",
   "author": "Vlad Seryakov",
   "name": "bkjs-wand",
   "description": "Imagemagick wand support for node.js and backendjs",

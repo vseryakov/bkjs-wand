@@ -222,121 +222,133 @@ static void doResizeImage(uv_work_t *req)
     }
     int width = MagickGetImageWidth(wand);
     int height = MagickGetImageHeight(wand);
+    int frames = MagickGetNumberImages(wand);
     if (status == MagickFalse) goto err;
 
-    str = MagickGetImageProperty(wand, "exif:Orientation");
-    if (str) {
-        baton->d.orientation = atoi(str);
-        free(str);
-    }
-
-    // Negative width or height means we should not upscale if the image is already below the given dimensions
-    if (baton->d.width < 0) {
-        baton->d.width *= -1;
-        if (width <= baton->d.width) baton->d.width = 0;
-    }
-    if (baton->d.height < 0) {
-        baton->d.height *= -1;
-        if (height <= baton->d.height) baton->d.height = 0;
-    }
-
-    // Keep the aspect if no dimensions given
-    if (baton->d.height == 0 || baton->d.width == 0) {
-        float aspectRatio = (width * 1.0)/height;
-        if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
-        if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
-    }
-    if (baton->d.crop_width && baton->d.crop_height) {
-        status = MagickCropImage(wand, baton->d.crop_width, baton->d.crop_height, baton->d.crop_x, baton->d.crop_y);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.rotate) {
-        PixelWand *bg = NewPixelWand();
-        PixelSetColor(bg, baton->bgcolor.c_str());
-        status = MagickRotateImage(wand, bg, baton->d.rotate);
-        DestroyPixelWand(bg);
-        if (status == MagickFalse) goto err;
-    } else
-    if (baton->bgcolor.size()) {
-        PixelWand *bg = NewPixelWand();
-        PixelSetColor(bg, baton->bgcolor.c_str());
-        status = MagickSetImageBackgroundColor(wand, bg);
-        DestroyPixelWand(bg);
-        if (status == MagickFalse) goto err;
-        MagickWand *nwand = MagickMergeImageLayers(wand, FlattenLayer);
-        if (nwand) {
-            DestroyMagickWand(wand);
-            wand = nwand;
+    // Skip animated GIF modifications until implemented properly
+    if (frames <= 1) {
+        str = MagickGetImageProperty(wand, "exif:Orientation");
+        if (str) {
+            baton->d.orientation = atoi(str);
+            free(str);
         }
-    }
-    if (baton->d.colorspace != UndefinedColorspace) {
-        status = MagickSetImageColorspace(wand, baton->d.colorspace);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.gravity != UndefinedGravity) {
-        status = MagickSetImageGravity(wand, baton->d.gravity);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.opacity) {
-        status = MagickSetImageAlpha(wand, baton->d.opacity);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.normalize) {
-        status = MagickNormalizeImage(wand);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.posterize) {
-        status = MagickPosterizeImage(wand, baton->d.posterize, baton->d.dither);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.quantize) {
-        status = MagickQuantizeImage(wand, baton->d.quantize, RGBColorspace, baton->d.tree_depth, baton->d.dither, (MagickBooleanType)0);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.flip) {
-        status = MagickFlipImage(wand);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.flop) {
-        status = MagickFlopImage(wand);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.width && baton->d.height) {
-        status = MagickResizeImage(wand, baton->d.width, baton->d.height, baton->filter);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.blur_radius || baton->d.blur_sigma) {
-        status = MagickAdaptiveBlurImage(wand, baton->d.blur_radius, baton->d.blur_sigma);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->d.brightness || baton->d.contrast) {
+
+        // Negative width or height means we should not upscale if the image is already below the given dimensions
+        if (baton->d.width < 0) {
+            baton->d.width *= -1;
+            if (width <= baton->d.width) baton->d.width = 0;
+        }
+        if (baton->d.height < 0) {
+            baton->d.height *= -1;
+            if (height <= baton->d.height) baton->d.height = 0;
+        }
+
+        // Keep the aspect if no dimensions given
+        if (baton->d.height == 0 || baton->d.width == 0) {
+            float aspectRatio = (width * 1.0)/height;
+            if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
+                if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
+        }
+        if (baton->d.crop_width && baton->d.crop_height) {
+            status = MagickCropImage(wand, baton->d.crop_width, baton->d.crop_height, baton->d.crop_x, baton->d.crop_y);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.rotate) {
+            PixelWand *bg = NewPixelWand();
+            PixelSetColor(bg, baton->bgcolor.c_str());
+            status = MagickRotateImage(wand, bg, baton->d.rotate);
+            DestroyPixelWand(bg);
+            if (status == MagickFalse) goto err;
+        } else
+        if (baton->bgcolor.size()) {
+            PixelWand *bg = NewPixelWand();
+            PixelSetColor(bg, baton->bgcolor.c_str());
+            status = MagickSetImageBackgroundColor(wand, bg);
+            DestroyPixelWand(bg);
+            if (status == MagickFalse) goto err;
+            MagickWand *nwand = MagickMergeImageLayers(wand, FlattenLayer);
+            if (nwand) {
+                DestroyMagickWand(wand);
+                wand = nwand;
+            }
+        }
+        if (baton->d.colorspace != UndefinedColorspace) {
+            status = MagickSetImageColorspace(wand, baton->d.colorspace);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.gravity != UndefinedGravity) {
+            status = MagickSetImageGravity(wand, baton->d.gravity);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.opacity) {
+            status = MagickSetImageAlpha(wand, baton->d.opacity);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.normalize) {
+            status = MagickNormalizeImage(wand);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.posterize) {
+            status = MagickPosterizeImage(wand, baton->d.posterize, baton->d.dither);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.quantize) {
+            status = MagickQuantizeImage(wand, baton->d.quantize, RGBColorspace, baton->d.tree_depth, baton->d.dither, (MagickBooleanType)0);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.flip) {
+            status = MagickFlipImage(wand);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.flop) {
+            status = MagickFlopImage(wand);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.width && baton->d.height) {
+            status = MagickResizeImage(wand, baton->d.width, baton->d.height, baton->filter);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.blur_radius || baton->d.blur_sigma) {
+            status = MagickAdaptiveBlurImage(wand, baton->d.blur_radius, baton->d.blur_sigma);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.brightness || baton->d.contrast) {
 #ifdef JincFilter
-        status = MagickBrightnessContrastImage(wand, baton->d.brightness, baton->d.contrast);
-        if (status == MagickFalse) goto err;
+            status = MagickBrightnessContrastImage(wand, baton->d.brightness, baton->d.contrast);
+            if (status == MagickFalse) goto err;
 #endif
-    }
-    if (baton->d.sharpen_radius || baton->d.sharpen_sigma) {
-        status = MagickAdaptiveSharpenImage(wand, baton->d.sharpen_radius, baton->d.sharpen_sigma);
-        if (status == MagickFalse) goto err;
-    }
-    if (baton->format.size()) {
-        const char *fmt = baton->format.c_str();
-        while (fmt && *fmt && *fmt == '.') fmt++;
-        MagickSetImageFormat(wand, fmt);
-    }
-    if (baton->d.quality <= 100) {
-        MagickSetImageCompressionQuality(wand, baton->d.quality);
+        }
+        if (baton->d.sharpen_radius || baton->d.sharpen_sigma) {
+            status = MagickAdaptiveSharpenImage(wand, baton->d.sharpen_radius, baton->d.sharpen_sigma);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->format.size()) {
+            const char *fmt = baton->format.c_str();
+            while (fmt && *fmt && *fmt == '.') fmt++;
+            MagickSetImageFormat(wand, fmt);
+        }
+        if (baton->d.quality <= 100) {
+            MagickSetImageCompressionQuality(wand, baton->d.quality);
+        }
     }
     if (baton->out.size()) {
         // Make sure all subdirs exist
         if (bkMakePath(baton->out)) {
-            status = MagickWriteImage(wand, baton->out.c_str());
+            if (frames > 1) {
+                status = MagickWriteImages(wand, baton->out.c_str(), MagickTrue);
+            } else {
+                status = MagickWriteImage(wand, baton->out.c_str());
+            }
             if (status == MagickFalse) goto err;
         } else {
             baton->err = errno;
         }
     } else {
-        baton->image = MagickGetImageBlob(wand, &baton->length);
+        if (frames > 1) {
+            baton->image = MagickGetImagesBlob(wand, &baton->length);
+        } else {
+            baton->image = MagickGetImageBlob(wand, &baton->length);
+        }
         if (!baton->image) goto err;
     }
     // Output info about the new or unmodified image
