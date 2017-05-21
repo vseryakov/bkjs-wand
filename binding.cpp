@@ -42,6 +42,7 @@ public:
     char *exception;
     string format;
     string path;
+    string ext;
     string out;
     FilterType filter;
     int err;
@@ -51,6 +52,7 @@ public:
         int quality;
         int width;
         int height;
+        int frame;
         double blur_radius;
         double blur_sigma;
         double sharpen_radius;
@@ -73,6 +75,7 @@ public:
         double rotate;
         double opacity;
         int orientation;
+        int no_animation;
     } d;
 };
 
@@ -223,32 +226,45 @@ static void doResizeImage(uv_work_t *req)
     int width = MagickGetImageWidth(wand);
     int height = MagickGetImageHeight(wand);
     int frames = MagickGetNumberImages(wand);
+
     if (status == MagickFalse) goto err;
 
+    str = MagickGetImageProperty(wand, "exif:Orientation");
+    if (str) {
+        baton->d.orientation = atoi(str);
+        free(str);
+    }
+
+    // Negative width or height means we should not upscale if the image is already below the given dimensions
+    if (baton->d.width < 0) {
+        baton->d.width *= -1;
+        if (width <= baton->d.width) baton->d.width = 0;
+    }
+    if (baton->d.height < 0) {
+        baton->d.height *= -1;
+        if (height <= baton->d.height) baton->d.height = 0;
+    }
+
+    // Keep the aspect if no dimensions given
+    if (baton->d.height == 0 || baton->d.width == 0) {
+        float aspectRatio = (width * 1.0)/height;
+        if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
+            if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
+    }
+
     // Skip animated GIF modifications until implemented properly
-    if (frames <= 1) {
-        str = MagickGetImageProperty(wand, "exif:Orientation");
-        if (str) {
-            baton->d.orientation = atoi(str);
-            free(str);
+    if (frames <= 1 || baton->d.no_animation) {
+        // Use the only the specified frame, -1 for converting all TODO
+        if (frames > 1 && baton->d.frame >= 0) {
+            MagickWand *lwand = MagickCoalesceImages(wand);
+            if (!lwand) goto err;
+            DestroyMagickWand(wand);
+            wand = lwand;
+            status = MagickSetIteratorIndex(wand, baton->d.frame);
+            if (status == MagickFalse) goto err;
+            frames = 1;
         }
 
-        // Negative width or height means we should not upscale if the image is already below the given dimensions
-        if (baton->d.width < 0) {
-            baton->d.width *= -1;
-            if (width <= baton->d.width) baton->d.width = 0;
-        }
-        if (baton->d.height < 0) {
-            baton->d.height *= -1;
-            if (height <= baton->d.height) baton->d.height = 0;
-        }
-
-        // Keep the aspect if no dimensions given
-        if (baton->d.height == 0 || baton->d.width == 0) {
-            float aspectRatio = (width * 1.0)/height;
-            if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
-                if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
-        }
         if (baton->d.crop_width && baton->d.crop_height) {
             status = MagickCropImage(wand, baton->d.crop_width, baton->d.crop_height, baton->d.crop_x, baton->d.crop_y);
             if (status == MagickFalse) goto err;
@@ -322,18 +338,34 @@ static void doResizeImage(uv_work_t *req)
             status = MagickAdaptiveSharpenImage(wand, baton->d.sharpen_radius, baton->d.sharpen_sigma);
             if (status == MagickFalse) goto err;
         }
-        if (baton->format.size()) {
-            const char *fmt = baton->format.c_str();
-            while (fmt && *fmt && *fmt == '.') fmt++;
+        const char *fmt = baton->format.c_str();
+        while (fmt && *fmt && *fmt == '.') fmt++;
+        if (fmt && *fmt) {
             MagickSetImageFormat(wand, fmt);
         }
         if (baton->d.quality <= 100) {
             MagickSetImageCompressionQuality(wand, baton->d.quality);
         }
     }
+    // Output info about the new or unmodified image
+    baton->d.width = MagickGetImageWidth(wand);
+    baton->d.height = MagickGetImageHeight(wand);
+    str = MagickGetImageFormat(wand);
+    if (str) {
+        baton->ext = str;
+        free(str);
+    }
+    // File extension, lowercase and 3 letters only
+    std::transform(baton->ext.begin(), baton->ext.end(), baton->ext.begin(), ::tolower);
+    if (baton->ext == "jpeg") baton->ext = "jpg";
+
     if (baton->out.size()) {
         // Make sure all subdirs exist
         if (bkMakePath(baton->out)) {
+            string::size_type dot = baton->out.find_last_of('.');
+            if (dot != string::npos) baton->out = baton->out.substr(0, dot);
+            baton->out += "." + baton->ext;
+
             if (frames > 1) {
                 status = MagickWriteImages(wand, baton->out.c_str(), MagickTrue);
             } else {
@@ -350,14 +382,6 @@ static void doResizeImage(uv_work_t *req)
             baton->image = MagickGetImageBlob(wand, &baton->length);
         }
         if (!baton->image) goto err;
-    }
-    // Output info about the new or unmodified image
-    baton->d.width = MagickGetImageWidth(wand);
-    baton->d.height = MagickGetImageHeight(wand);
-    str = MagickGetImageFormat(wand);
-    if (str) {
-        baton->format = str;
-        free(str);
     }
     DestroyMagickWand(wand);
     return;
@@ -380,7 +404,8 @@ static void afterResizeImage(uv_work_t *req)
             NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), cb, 1, argv);
         } else {
             Local<Object> info = Nan::New<Object>();
-            info->Set(Nan::New("format").ToLocalChecked(), Nan::New(baton->format).ToLocalChecked());
+            info->Set(Nan::New("format").ToLocalChecked(), Nan::New(baton->ext).ToLocalChecked());
+            if (baton->out.size()) info->Set(Nan::New("file").ToLocalChecked(), Nan::New(baton->out).ToLocalChecked());
             if (baton->d.orientation) info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
             info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
             info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
@@ -436,6 +461,8 @@ static NAN_METHOD(resizeImage)
         if (!strcmp(*key, "brightness")) baton->d.brightness = atof(*val); else
         if (!strcmp(*key, "contrast")) baton->d.contrast = atof(*val); else
         if (!strcmp(*key, "rotate")) baton->d.rotate = atof(*val); else
+        if (!strcmp(*key, "no_animation")) baton->d.no_animation = atof(*val); else
+        if (!strcmp(*key, "frame")) baton->d.frame = atof(*val); else
         if (!strcmp(*key, "opacity")) baton->d.rotate = atof(*val); else
         if (!strcmp(*key, "crop_width")) baton->d.crop_width = atoi(*val); else
         if (!strcmp(*key, "crop_height")) baton->d.crop_height = atoi(*val); else

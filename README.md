@@ -22,6 +22,8 @@ Installing dependencies on Mac OS X using macports:
      - out - output file name
      - ext - image extention
      - outfile - a filename where to save scaled image, if not given the binary image data is passed to the callback
+     - frame - which frame to resize for animated GIFs, 0 is default, -1 to convert all frames
+     - no_animation - if set to 1 it will convert GIF animation, otherwise animated GIF is simply returned as is
      - posterize - levels, 2,3,4
      - dither - 1 to dither
      - normalize - 1 to normalize image
@@ -50,6 +52,10 @@ Installing dependencies on Mac OS X using macports:
                     cmylk, srgb, hls, hwb
      - gravity - northwest, north, northeast, west, center, east, southwest, south, southeast
 
+  On return the callback will receive the image data if no outfile was specified or null, and the third
+  argument if an object with the result image information: file, ext, height, width, orientation. The file
+  where the image is sved will have the actual extention, if the outfile parameter contains invalid extention
+  it will be replaced with the actual resulting image type.
 
 ```javascript
   require("bkjs-wand").resizeImage("a.png", { width: 120, height: 120 }, function(err, data, info) {
