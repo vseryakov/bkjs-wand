@@ -69,6 +69,7 @@ public:
         bool normalize;
         bool flip;
         bool flop;
+        bool strip;
         ColorspaceType colorspace;
         DitherMethod dither;
         GravityType gravity;
@@ -215,6 +216,7 @@ static void doResizeImage(uv_work_t *req)
     MagickBooleanType status;
     ExceptionType severity;
     char *str;
+    int d;
 
     if (baton->image) {
         status = MagickReadImageBlob(wand, baton->image, baton->length);
@@ -223,8 +225,6 @@ static void doResizeImage(uv_work_t *req)
     } else {
         status = MagickReadImage(wand, baton->path.c_str());
     }
-    int width = MagickGetImageWidth(wand);
-    int height = MagickGetImageHeight(wand);
     int frames = MagickGetNumberImages(wand);
 
     if (status == MagickFalse) goto err;
@@ -233,23 +233,6 @@ static void doResizeImage(uv_work_t *req)
     if (str) {
         baton->d.orientation = atoi(str);
         free(str);
-    }
-
-    // Negative width or height means we should not upscale if the image is already below the given dimensions
-    if (baton->d.width < 0) {
-        baton->d.width *= -1;
-        if (width <= baton->d.width) baton->d.width = 0;
-    }
-    if (baton->d.height < 0) {
-        baton->d.height *= -1;
-        if (height <= baton->d.height) baton->d.height = 0;
-    }
-
-    // Keep the aspect if no dimensions given
-    if (baton->d.height == 0 || baton->d.width == 0) {
-        float aspectRatio = (width * 1.0)/height;
-        if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
-            if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
     }
 
     // Skip animated GIF modifications until implemented properly
@@ -265,16 +248,15 @@ static void doResizeImage(uv_work_t *req)
             frames = 1;
         }
 
-        if (baton->d.crop_width && baton->d.crop_height) {
-            status = MagickCropImage(wand, baton->d.crop_width, baton->d.crop_height, baton->d.crop_x, baton->d.crop_y);
-            if (status == MagickFalse) goto err;
-        }
         if (baton->d.rotate) {
             PixelWand *bg = NewPixelWand();
             PixelSetColor(bg, baton->bgcolor.c_str());
             status = MagickRotateImage(wand, bg, baton->d.rotate);
             DestroyPixelWand(bg);
             if (status == MagickFalse) goto err;
+            // Have to strip because EXIF data is preserved
+            MagickStripImage(wand);
+            baton->d.orientation = 0;
         } else
         if (baton->bgcolor.size()) {
             PixelWand *bg = NewPixelWand();
@@ -288,12 +270,40 @@ static void doResizeImage(uv_work_t *req)
                 wand = nwand;
             }
         }
+        int width = MagickGetImageWidth(wand);
+        int height = MagickGetImageHeight(wand);
+
+        if (baton->d.crop_width && baton->d.crop_height) {
+            status = MagickCropImage(wand, baton->d.crop_width, baton->d.crop_height, baton->d.crop_x, baton->d.crop_y);
+            if (status == MagickFalse) goto err;
+        }
+        // Negative width or height means we should not upscale if the image is already below the given dimensions
+        if (baton->d.width < 0) {
+            baton->d.width *= -1;
+            if (width <= baton->d.width) baton->d.width = 0;
+        }
+        if (baton->d.height < 0) {
+            baton->d.height *= -1;
+            if (height <= baton->d.height) baton->d.height = 0;
+        }
+
+        // Keep the aspect if no dimensions given
+        if (baton->d.height == 0 || baton->d.width == 0) {
+            float aspectRatio = (width * 1.0)/height;
+            if (baton->d.height == 0) baton->d.height = baton->d.width * (1.0/aspectRatio); else
+                if (baton->d.width == 0) baton->d.width = baton->d.height * aspectRatio;
+        }
+
         if (baton->d.colorspace != UndefinedColorspace) {
             status = MagickSetImageColorspace(wand, baton->d.colorspace);
             if (status == MagickFalse) goto err;
         }
         if (baton->d.gravity != UndefinedGravity) {
             status = MagickSetImageGravity(wand, baton->d.gravity);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.strip) {
+            status = MagickStripImage(wand);
             if (status == MagickFalse) goto err;
         }
         if (baton->d.opacity) {
@@ -449,7 +459,8 @@ static NAN_METHOD(resizeImage)
         if (!strcmp(*key, "normalize")) baton->d.normalize = (DitherMethod)atoi(*val); else
         if (!strcmp(*key, "quantize")) baton->d.quantize = atoi(*val); else
         if (!strcmp(*key, "treedepth")) baton->d.tree_depth = atoi(*val); else
-        if (!strcmp(*key, "flip")) baton->d.normalize = atoi(*val); else
+        if (!strcmp(*key, "flip")) baton->d.flip = atoi(*val); else
+        if (!strcmp(*key, "strip")) baton->d.strip = atoi(*val); else
         if (!strcmp(*key, "flop")) baton->d.flop = atoi(*val); else
         if (!strcmp(*key, "width")) baton->d.width = atoi(*val); else
         if (!strcmp(*key, "height")) baton->d.height = atoi(*val); else
