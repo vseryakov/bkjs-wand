@@ -254,9 +254,9 @@ static void doResizeImage(uv_work_t *req)
             status = MagickRotateImage(wand, bg, baton->d.rotate);
             DestroyPixelWand(bg);
             if (status == MagickFalse) goto err;
-            // Have to strip because EXIF data is preserved
-            MagickStripImage(wand);
+            // Have to strip because EXIF data is always preserved
             baton->d.orientation = 0;
+            baton->d.strip = 1;
         } else
         if (baton->bgcolor.size()) {
             PixelWand *bg = NewPixelWand();
@@ -302,10 +302,6 @@ static void doResizeImage(uv_work_t *req)
             status = MagickSetImageGravity(wand, baton->d.gravity);
             if (status == MagickFalse) goto err;
         }
-        if (baton->d.strip) {
-            status = MagickStripImage(wand);
-            if (status == MagickFalse) goto err;
-        }
         if (baton->d.opacity) {
             status = MagickSetImageAlpha(wand, baton->d.opacity);
             if (status == MagickFalse) goto err;
@@ -346,6 +342,10 @@ static void doResizeImage(uv_work_t *req)
         }
         if (baton->d.sharpen_radius || baton->d.sharpen_sigma) {
             status = MagickAdaptiveSharpenImage(wand, baton->d.sharpen_radius, baton->d.sharpen_sigma);
+            if (status == MagickFalse) goto err;
+        }
+        if (baton->d.strip) {
+            status = MagickStripImage(wand);
             if (status == MagickFalse) goto err;
         }
         const char *fmt = baton->format.c_str();
