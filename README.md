@@ -53,8 +53,11 @@ Installing dependencies on Mac OS X using macports:
      - gravity - northwest, north, northeast, west, center, east, southwest, south, southeast
 
   On return the callback will receive the image data if no outfile was specified or null, and the third
-  argument if an object with the result image information: file, ext, height, width, orientation. The file
-  where the image is sved will have the actual extention, if the outfile parameter contains invalid extention
+  argument if an object with the result image information: file, ext, height, width, orientation, rotation. 
+
+  The original image dimentions are returned as _width and _height.
+
+  The file where the image is sved will have the actual extention, if the outfile parameter contains invalid extention
   it will be replaced with the actual resulting image type.
 
 ```javascript
