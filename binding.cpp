@@ -49,6 +49,12 @@ public:
     size_t length;
     string bgcolor;
     struct {
+        int width;
+        int height;
+        int orientation;
+        string ext;
+    } o;
+    struct {
         int quality;
         int width;
         int height;
@@ -229,11 +235,21 @@ static void doResizeImage(uv_work_t *req)
 
     if (status == MagickFalse) goto err;
 
+    // Original image properties
+    baton->o.width = MagickGetImageWidth(wand);
+    baton->o.height = MagickGetImageHeight(wand);
     str = MagickGetImageProperty(wand, "exif:Orientation");
     if (str) {
-        baton->d.orientation = atoi(str);
+        baton->d.orientation = baton->o.orientation = atoi(str);
         free(str);
     }
+    str = MagickGetImageFormat(wand);
+    if (str) {
+        baton->o.ext = str;
+        free(str);
+    }
+    std::transform(baton->o.ext.begin(), baton->o.ext.end(), baton->o.ext.begin(), ::tolower);
+    if (baton->o.ext == "jpeg") baton->o.ext = "jpg";
 
     // Skip animated GIF modifications until implemented properly
     if (frames <= 1 || baton->d.no_animation) {
@@ -419,6 +435,10 @@ static void afterResizeImage(uv_work_t *req)
             if (baton->d.orientation) info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
             info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
             info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
+            info->Set(Nan::New("_width").ToLocalChecked(), Nan::New(baton->o.width));
+            info->Set(Nan::New("_height").ToLocalChecked(), Nan::New(baton->o.height));
+            if (baton->o.ext.size()) info->Set(Nan::New("_ext").ToLocalChecked(), Nan::New(baton->o.ext).ToLocalChecked());
+            if (baton->o.orientation) info->Set(Nan::New("_orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->o.orientation)).ToLocalChecked());
             if (baton->image) {
                 argv[0] = Nan::Null();
                 argv[1] = Nan::CopyBuffer((const char*)baton->image, baton->length).ToLocalChecked();
