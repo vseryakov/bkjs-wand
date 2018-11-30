@@ -31,4 +31,7 @@ fi
                  --without-magick-plus-plus \
                  --without-perl)
 (cd $BKJS_DEPS/ImageMagick && make install)
+ISED="-i"
+[ "$(uname -s)" = "Darwin" ] && ISED="-i ''"
+for f in $BKJS_PREFIX/lib/pkgconfig/*; do sed $ISED 's/MAGICK_EXTRA_DEP_LIBS//' $f;done
 exit 0

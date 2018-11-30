@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": "Vlad Seryakov",
   "name": "bkjs-wand",
   "description": "Imagemagick wand support for node.js and backendjs",
@@ -10,10 +10,11 @@
     "url": "https://github.com/vseryakov/bkjs-wand.git"
   },
   "dependencies": {
+    "help": "^3.0.2",
     "nan": ">= 2.4.0"
   },
   "engines": {
-    "node": ">= 0.10"
+    "node": ">= 6.0"
   },
   "license": "BSD-3-Clause",
   "gypfile": true,
