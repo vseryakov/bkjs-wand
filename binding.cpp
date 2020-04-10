@@ -20,8 +20,9 @@ using namespace std;
 #ifdef USE_WAND
 
 #define NAN_REQUIRE_ARGUMENT(i) if (info.Length() <= i || info[i]->IsUndefined()) {Nan::ThrowError("Argument " #i " is required");return;}
-#define NAN_REQUIRE_ARGUMENT_OBJECT(i, var) if (info.Length() <= (i) || !info[i]->IsObject()) {Nan::ThrowError("Argument " #i " must be an object"); return;} Local<Object> var(info[i]->ToObject());
-#define NAN_TRY_CATCH_CALL(context, callback, argc, argv) { Nan::TryCatch try_catch; (callback)->Call((context), (argc), (argv)); if (try_catch.HasCaught()) FatalException(try_catch); }
+#define NAN_REQUIRE_ARGUMENT_OBJECT(i, var) if (info.Length() <= (i) || !info[i]->IsObject()) {Nan::ThrowError("Argument " #i " must be an object"); return;} Local<Object> var(Nan::To<v8::Object>(info[i]).ToLocalChecked());
+
+#define NAN_TRY_CATCH_CALL(context, callback, argc, argv) { Nan::TryCatch try_catch; Nan::Call((callback), (context), (argc), (argv)); if (try_catch.HasCaught()) FatalException(try_catch); }
 
 #include "MagickWand/MagickWand.h"
 
@@ -439,20 +440,20 @@ static void afterResizeImage(uv_work_t *req)
             NAN_TRY_CATCH_CALL(Nan::GetCurrentContext()->Global(), cb, 1, argv);
         } else {
             Local<Object> info = Nan::New<Object>();
-            info->Set(Nan::New("ext").ToLocalChecked(), Nan::New(baton->ext).ToLocalChecked());
-            if (baton->out.size()) info->Set(Nan::New("file").ToLocalChecked(), Nan::New(baton->out).ToLocalChecked());
+            Nan::Set(info, Nan::New("ext").ToLocalChecked(), Nan::New(baton->ext).ToLocalChecked());
+            if (baton->out.size()) Nan::Set(info, Nan::New("file").ToLocalChecked(), Nan::New(baton->out).ToLocalChecked());
             if (baton->d.orientation) {
-                info->Set(Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
-                info->Set(Nan::New("rotation").ToLocalChecked(), Nan::New(getMagickAngle(baton->d.orientation)));
+                Nan::Set(info, Nan::New("orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->d.orientation)).ToLocalChecked());
+                Nan::Set(info, Nan::New("rotation").ToLocalChecked(), Nan::New(getMagickAngle(baton->d.orientation)));
             }
-            info->Set(Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
-            info->Set(Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
-            info->Set(Nan::New("_width").ToLocalChecked(), Nan::New(baton->o.width));
-            info->Set(Nan::New("_height").ToLocalChecked(), Nan::New(baton->o.height));
-            if (baton->o.ext.size()) info->Set(Nan::New("_ext").ToLocalChecked(), Nan::New(baton->o.ext).ToLocalChecked());
+            Nan::Set(info, Nan::New("width").ToLocalChecked(), Nan::New(baton->d.width));
+            Nan::Set(info, Nan::New("height").ToLocalChecked(), Nan::New(baton->d.height));
+            Nan::Set(info, Nan::New("_width").ToLocalChecked(), Nan::New(baton->o.width));
+            Nan::Set(info, Nan::New("_height").ToLocalChecked(), Nan::New(baton->o.height));
+            if (baton->o.ext.size()) Nan::Set(info, Nan::New("_ext").ToLocalChecked(), Nan::New(baton->o.ext).ToLocalChecked());
             if (baton->o.orientation) {
-                info->Set(Nan::New("_orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->o.orientation)).ToLocalChecked());
-                info->Set(Nan::New("_rotation").ToLocalChecked(), Nan::New(getMagickAngle(baton->o.orientation)));
+                Nan::Set(info, Nan::New("_orientation").ToLocalChecked(), Nan::New(getMagickOrientation(baton->o.orientation)).ToLocalChecked());
+                Nan::Set(info, Nan::New("_rotation").ToLocalChecked(), Nan::New(getMagickAngle(baton->o.orientation)));
             }
             if (baton->image) {
                 argv[0] = Nan::Null();
@@ -485,10 +486,10 @@ static NAN_METHOD(resizeImage)
         baton->cb.Reset(Local<Function>::Cast(info[2]));
     }
 
-    const Local<Array> names = opts->GetPropertyNames();
+    const Local<Array> names = Nan::GetPropertyNames(opts).ToLocalChecked();
     for (uint i = 0 ; i < names->Length(); ++i) {
-        String::Utf8Value key(names->Get(i));
-        String::Utf8Value val(opts->Get(names->Get(i))->ToString());
+        Nan::Utf8String key(Nan::Get(names, i).ToLocalChecked());
+        Nan::Utf8String val(Nan::Get(opts, Nan::Get(names, i).ToLocalChecked()).ToLocalChecked());
         if (!strcmp(*key, "posterize")) baton->d.posterize = atoi(*val); else
         if (!strcmp(*key, "dither")) baton->d.dither = (DitherMethod)atoi(*val); else
         if (!strcmp(*key, "normalize")) baton->d.normalize = (DitherMethod)atoi(*val); else
@@ -524,7 +525,7 @@ static NAN_METHOD(resizeImage)
 
     // If a Buffer passed we use it as a source for image
     if (info[0]->IsObject()) {
-        Local<Object> buf = info[0]->ToObject();
+        Local<Object> buf = Nan::To<Object>(info[0]).ToLocalChecked();
         baton->length = Buffer::Length(buf);
         baton->image = (unsigned char*)malloc(baton->length);
         memcpy(baton->image, Buffer::Data(buf), baton->length);
@@ -539,8 +540,6 @@ static NAN_METHOD(resizeImage)
 
 static NAN_MODULE_INIT(WandInit)
 {
-    Nan::HandleScope scope;
-
     MagickWandGenesis();
     NAN_EXPORT(target, resizeImage);
 }
