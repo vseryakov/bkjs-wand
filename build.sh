@@ -18,7 +18,7 @@ fi
 pkg-config --silence-errors --exists Wand
 if [ ! -d $BKJS_DEPS/ImageMagick ]; then
    mkdir -p $BKJS_DEPS/ImageMagick
-   curl -OL https://www.imagemagick.org/download/ImageMagick.tar.gz
+   curl -OL https://imagemagick.org/archive/ImageMagick.tar.gz
    tar -C $BKJS_DEPS/ImageMagick --strip-components=1 -xzf ImageMagick.tar.gz && rm -rf ImageMagick.tar.gz
 fi
 (cd $BKJS_DEPS/ImageMagick && [ ! -f Makefile ] && ./configure --prefix=$BKJS_PREFIX \
@@ -32,6 +32,6 @@ fi
                  --without-perl)
 (cd $BKJS_DEPS/ImageMagick && make install)
 ISED="-i"
-[ "$(uname -s)" = "Darwin" ] && ISED="-i ''"
+[ "$(uname -s)" = "Darwin" ] && ISED="-i .orig"
 for f in $BKJS_PREFIX/lib/pkgconfig/*; do sed $ISED 's/MAGICK_EXTRA_DEP_LIBS//' $f;done
 exit 0
